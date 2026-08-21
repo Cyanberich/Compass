@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="指南针" />
+  <meta name="theme-color" content="#000000" />
+  <title>指南针</title>
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
+    }
+
+    .location {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 14px;
+      color: rgba(255,255,255,0.85);
+      letter-spacing: 0.5px;
+      min-height: 18px;
+      flex: none;
+    }
+    .location svg { flex: none; }
+
+    .heading-readout {
+      text-align: center;
+      flex: none;
+      margin-top: 2px;
+    }
+    .degrees {
+      font-size: 58px;
+      font-weight: 200;
+      letter-spacing: -2px;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .direction {
+      font-size: 14px;
+      color: rgba(255,255,255,0.5);
+      margin-top: 4px;
+      letter-spacing: 3px;
+      min-height: 18px;
+    }
+
+    .compass-wrap {
+      flex: 1 1 auto;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+      margin-top: 4px;
+    }
+    svg.dial {
+      width: min(80vw, 360px, 55vh);
+      height: min(80vw, 360px, 55vh);
+      display: block;
+      overflow: visible;
+    }
+
+    .data-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      width: 100%;
+      max-width: 400px;
+      gap: 8px;
+      flex: none;
+      margin-top: 10px;
+    }
+    .cell {
+      display: flex; flex-direction: row; align-items: center; justify-content: space-between;
+      gap: 8px;
+      padding: 10px 14px;
+      background: rgba(255,255,255,0.045);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      min-width: 0;
+    }
+    .cell-label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.45);
+      letter-spacing: 1px;
+      flex: none;
+    }
+    .cell-value {
+      font-size: 15px;
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+  <div class="location" id="location">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 21s-6.5-5.1-6.5-10.2A6.5 6.5 0 0 1 12 4.3a6.5 6.5 0 0 1 6.5 6.5C18.5 15.9 12 21 12 21z" stroke="rgba(255,255,255,0.7)" stroke-width="1.8"/>
+      <circle cx="12" cy="10.8" r="2.4" fill="#ff3b30"/>
+    </svg>
+    <span id="cityName">定位中…</span>
+  </div>
+
+  <div class="heading-readout">
+    <div class="degrees" id="degrees">—°</div>
+    <div class="direction" id="directionText">&nbsp;</div>
+  </div>
+
+  <div class="compass-wrap">
+    <svg class="dial" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" aria-label="compass">
+      <g id="rotating">
+        <circle cx="200" cy="200" r="192" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="2"/>
+      </g>
+      <polygon points="192,4 208,4 200,18" fill="#ff3b30"/>
+      <circle cx="200" cy="200" r="3.5" fill="rgba(255,255,255,0.9)"/>
+    </svg>
+  </div>
+
+  <div class="data-row" id="dataRow">
+    <div class="cell">
+      <div class="cell-label">经度</div>
+      <div class="cell-value" id="lonVal">—</div>
+    </div>
+    <div class="cell">
+      <div class="cell-label">纬度</div>
+      <div class="cell-value" id="latVal">—</div>
+    </div>
+    <div class="cell">
+      <div class="cell-label">海拔</div>
+      <div class="cell-value" id="altVal">—</div>
+    </div>
+    <div class="cell">
+      <div class="cell-label">气压</div>
+      <div class="cell-value" id="presVal">—</div>
+    </div>
+    <div class="cell">
+      <div class="cell-label">温度</div>
+      <div class="cell-value" id="tempVal">—</div>
+    </div>
+    <div class="cell">
+      <div class="cell-label">湿度</div>
+      <div class="cell-value" id="humVal">—</div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+
+  var CX = 200, CY = 200;
+  var RING = 192;
+  var R_TICK_OUTER = 188;
+  var R_TICK_INNER_CARDINAL = 160;
+  var R_TICK_INNER_MAJOR = 170;
+  var R_TICK_INNER_MINOR = 178;
+  var R_CARDINAL = 116;
+  var R_NUMBER = 152;
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+
+  var rotating = document.getElementById('rotating');
+
+  function buildDial() {
+    for (var deg = 0; deg < 360; deg += 2) {
+      var isCardinal = deg % 90 === 0;
+      var isMajor = deg % 30 === 0;
+      var rInner = isCardinal ? R_TICK_INNER_CARDINAL
+                   : isMajor   ? R_TICK_INNER_MAJOR
+                              : R_TICK_INNER_MINOR;
+      var a = (deg - 90) * Math.PI / 180;
+      var x1 = CX + R_TICK_OUTER * Math.cos(a);
+      var y1 = CY + R_TICK_OUTER * Math.sin(a);
+      var x2 = CX + rInner * Math.cos(a);
+      var y2 = CY + rInner * Math.sin(a);
+
+      var line = document.createElementNS(SVG_NS, 'line');
+      line.setAttribute('x1', x1.toFixed(2));
+      line.setAttribute('y1', y1.toFixed(2));
+      line.setAttribute('x2', x2.toFixed(2));
+      line.setAttribute('y2', y2.toFixed(2));
+      line.setAttribute('stroke', isCardinal ? 'rgba(255,255,255,1)'
+                          : isMajor     ? 'rgba(255,255,255,0.65)'
+                                        : 'rgba(255,255,255,0.32)');
+      line.setAttribute('stroke-width', isCardinal ? 3 : isMajor ? 2 : 1);
+      line.setAttribute('stroke-linecap', 'round');
+      rotating.appendChild(line);
+    }
+
+    var disc = document.createElementNS(SVG_NS, 'circle');
+    disc.setAttribute('cx', CX);
+    disc.setAttribute('cy', CY);
+    disc.setAttribute('r', RING - 4);
+    disc.setAttribute('fill', 'rgba(255,255,255,0.018)');
+    rotating.insertBefore(disc, rotating.firstChild);
+
+    var cardinals = [
+      { deg:   0, text: '北', size: 40, weight: 600, fill: '#ff3b30' },
+      { deg:  90, text: '东', size: 32, weight: 400, fill: 'rgba(255,255,255,0.92)' },
+      { deg: 180, text: '南', size: 32, weight: 400, fill: 'rgba(255,255,255,0.92)' },
+      { deg: 270, text: '西', size: 32, weight: 400, fill: 'rgba(255,255,255,0.92)' }
+    ];
+    cardinals.forEach(function (c) {
+      var a = (c.deg - 90) * Math.PI / 180;
+      var x = CX + R_CARDINAL * Math.cos(a);
+      var y = CY + R_CARDINAL * Math.sin(a);
+      var t = document.createElementNS(SVG_NS, 'text');
+      t.setAttribute('x', x.toFixed(2));
+      t.setAttribute('y', y.toFixed(2));
+      t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('dominant-baseline', 'central');
+      t.setAttribute('font-size', c.size);
+      t.setAttribute('font-weight', c.weight);
+      t.setAttribute('fill', c.fill);
+      t.setAttribute('font-family', '-apple-system, "PingFang SC", "Helvetica Neue", sans-serif');
+      t.textContent = c.text;
+      rotating.appendChild(t);
+    });
+
+    [30, 60, 120, 150, 210, 240, 300, 330].forEach(function (deg) {
+      var a = (deg - 90) * Math.PI / 180;
+      var x = CX + R_NUMBER * Math.cos(a);
+      var y = CY + R_NUMBER * Math.sin(a);
+      var t = document.createElementNS(SVG_NS, 'text');
+      t.setAttribute('x', x.toFixed(2));
+      t.setAttribute('y', y.toFixed(2));
+      t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('dominant-baseline', 'central');
+      t.setAttribute('font-size', 15);
+      t.setAttribute('fill', 'rgba(255,255,255,0.45)');
+      t.setAttribute('font-family', '-apple-system, sans-serif');
+      t.setAttribute('font-weight', 300);
+      t.textContent = String(deg);
+      rotating.appendChild(t);
+    });
+  }
+
+  var DIRS = ['北', '东北', '东', '东南', '南', '西南', '西', '西北'];
+  function getDirection(deg) {
+    var n = ((Math.round(deg / 45) % 8) + 8) % 8;
+    return DIRS[n];
+  }
+
+  var currentHeading = 0;
+  var targetHeading = 0;
+  var hasHeading = false;
+  function tick() {
+    var diff = ((targetHeading - currentHeading + 540) % 360) - 180;
+    if (Math.abs(diff) > 0.02) {
+      currentHeading = (currentHeading + diff * 0.18 + 720) % 360;
+      rotating.setAttribute('transform', 'rotate(' + (-currentHeading).toFixed(2) + ' ' + CX + ' ' + CY + ')');
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  var degreesEl = document.getElementById('degrees');
+  var directionEl = document.getElementById('directionText');
+
+  function handleOrientation(e) {
+    var h = null;
+    if (e.webkitCompassHeading != null && !isNaN(e.webkitCompassHeading)) {
+      h = e.webkitCompassHeading;
+    } else if (e.alpha != null && !isNaN(e.alpha)) {
+      h = e.alpha;
+    }
+    if (h == null) return;
+    h = (h + 360) % 360;
+    targetHeading = h;
+    hasHeading = true;
+    degreesEl.textContent = Math.round(h) + '°';
+    directionEl.textContent = getDirection(h);
+    directionEl.style.color = 'rgba(255,255,255,0.5)';
+  }
+
+  var lonEl = document.getElementById('lonVal');
+  var latEl = document.getElementById('latVal');
+  var altEl = document.getElementById('altVal');
+  var tempEl = document.getElementById('tempVal');
+  var humEl = document.getElementById('humVal');
+  var cityEl = document.getElementById('cityName');
+  var presEl = document.getElementById('presVal');
+
+  function fmtCoord(v, posChar, negChar) {
+    if (v == null || isNaN(v)) return '—';
+    var c = v >= 0 ? posChar : negChar;
+    return Math.abs(v).toFixed(4) + '°' + c;
+  }
+
+  // 海拔：GPS 优先，Open-Meteo 地形高度兜底
+  var hasGpsAltitude = false;
+  var elevationFallback = null;
+  function renderAltitude(gpsAlt) {
+    if (gpsAlt != null && !isNaN(gpsAlt)) {
+      hasGpsAltitude = true;
+      altEl.textContent = gpsAlt.toFixed(1) + ' m';
+    } else if (!hasGpsAltitude && elevationFallback != null) {
+      altEl.textContent = Math.round(elevationFallback) + ' m';
+    } else {
+      altEl.textContent = '— m';
+    }
+  }
+  function fetchElevation(lat, lon) {
+    var url = 'https://api.open-meteo.com/v1/elevation?latitude=' + lat + '&longitude=' + lon;
+    fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.elevation && d.elevation.length) {
+          elevationFallback = d.elevation[0];
+          if (!hasGpsAltitude) altEl.textContent = Math.round(elevationFallback) + ' m';
+        }
+      })
+      .catch(function () {});
+  }
+
+  // 气压：传感器优先，天气 API 兜底
+  var sensorPressure = null;
+  var weatherPressure = null;
+  function renderPressure() {
+    if (sensorPressure != null) {
+      presEl.textContent = Math.round(sensorPressure) + ' hPa';
+    } else if (weatherPressure != null) {
+      presEl.textContent = Math.round(weatherPressure) + ' hPa';
+    } else {
+      presEl.textContent = '— hPa';
+    }
+  }
+
+  function fetchWeather(lat, lon) {
+    var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
+              '&current=temperature_2m,relative_humidity_2m,surface_pressure';
+    fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.current) {
+          if (d.current.temperature_2m != null) tempEl.textContent = d.current.temperature_2m.toFixed(1) + '°C';
+          if (d.current.relative_humidity_2m != null) humEl.textContent = Math.round(d.current.relative_humidity_2m) + '%';
+          if (d.current.surface_pressure != null) {
+            weatherPressure = d.current.surface_pressure;
+            renderPressure();
+          }
+        }
+      })
+      .catch(function () {
+        tempEl.textContent = '—';
+        humEl.textContent = '—';
+      });
+  }
+
+  function fetchCity(lat, lon) {
+    var url = 'https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + lat +
+              '&longitude=' + lon + '&localityLanguage=zh';
+    fetch(url)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var name = d.city || d.locality || d.principalSubdivision || '';
+        if (!name && d.countryName) name = d.countryName;
+        cityEl.textContent = name || '—';
+      })
+      .catch(function () {
+        cityEl.textContent = '—';
+      });
+  }
+
+  var weatherFetched = false;
+  function startGeolocation() {
+    if (!navigator.geolocation) {
+      lonEl.textContent = latEl.textContent = altEl.textContent = '不支持';
+      return;
+    }
+    navigator.geolocation.watchPosition(
+      function (pos) {
+        var c = pos.coords;
+        latEl.textContent = fmtCoord(c.latitude, 'N', 'S');
+        lonEl.textContent = fmtCoord(c.longitude, 'E', 'W');
+        renderAltitude(c.altitude);
+        if (!weatherFetched && c.latitude != null && c.longitude != null) {
+          weatherFetched = true;
+          fetchCity(c.latitude, c.longitude);
+          fetchWeather(c.latitude, c.longitude);
+          fetchElevation(c.latitude, c.longitude);
+        }
+      },
+      function () {
+        lonEl.textContent = latEl.textContent = altEl.textContent = '—';
+        cityEl.textContent = '—';
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 }
+    );
+  }
+
+  function startPressure() {
+    if (typeof AbsolutePressureSensor !== 'undefined') {
+      try {
+        var s = new AbsolutePressureSensor({ frequency: 1 });
+        s.addEventListener('reading', function () {
+          if (s.pressure != null && !isNaN(s.pressure)) {
+            sensorPressure = s.pressure;
+            renderPressure();
+          }
+        });
+        s.addEventListener('error', function () {});
+        s.start();
+      } catch (e) {}
+    }
+    renderPressure();
+  }
+
+  // ============== 罗盘自动启动 ==============
+  function needsPermission() {
+    return typeof DeviceOrientationEvent !== 'undefined' &&
+           typeof DeviceOrientationEvent.requestPermission === 'function';
+  }
+
+  function attachOrientation() {
+    window.addEventListener('deviceorientation', handleOrientation, true);
+  }
+
+  function autoStartCompass() {
+    // 关键 1：立即挂监听器——若权限此前已授予（持久化），事件直接可用，无需任何操作。
+    attachOrientation();
+
+    if (!needsPermission()) return;
+
+    // 关键 2：iOS 的授权必须由「有效的用户手势」触发。这里只用 click（可靠），
+    // 不用 touchstart（iOS 上不算有效手势，之前用它消费了监听器导致"怎么点都没反应"）。
+    var granted = false;
+    var pending = false;
+
+    function requestOnClick() {
+      if (granted || pending) return;
+      pending = true;
+      var p;
+      try {
+        p = DeviceOrientationEvent.requestPermission();
+      } catch (e) {
+        pending = false;
+        return;
+      }
+      p.then(function (r) {
+        pending = false;
+        if (r === 'granted') {
+          granted = true;
+          directionEl.textContent = '已开启';
+          directionEl.style.color = 'rgba(255,255,255,0.5)';
+        } else {
+          directionEl.textContent = '未授权，请退出后重开';
+          directionEl.style.color = 'rgba(255,255,255,0.4)';
+        }
+      }).catch(function () {
+        pending = false;
+      });
+    }
+    document.addEventListener('click', requestOnClick);
+
+    // 若 2.5s 内仍无方位数据，给极轻提示
+    setTimeout(function () {
+      if (!hasHeading && !granted) {
+        directionEl.textContent = '轻触屏幕开启罗盘';
+        directionEl.style.color = 'rgba(255,255,255,0.4)';
+      }
+    }, 2500);
+  }
+
+  function init() {
+    buildDial();
+    startGeolocation();
+    startPressure();
+    autoStartCompass();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
