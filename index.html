@@ -131,8 +131,17 @@
       <g id="rotating">
         <circle cx="200" cy="200" r="192" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="2"/>
       </g>
+
+      <!-- 水平仪：固定参考圆 + 随倾斜移动的气泡圆，完全重合即表示已放平 -->
+      <g id="level">
+        <circle cx="200" cy="200" r="48" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
+        <circle cx="200" cy="200" r="28" fill="none" stroke="rgba(255,255,255,0.40)" stroke-width="1.5"/>
+        <line x1="200" y1="148" x2="200" y2="252" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+        <line x1="148" y1="200" x2="252" y2="200" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+        <circle id="bubble" cx="200" cy="200" r="28" fill="rgba(255,255,255,0.10)" stroke="rgba(255,255,255,0.9)" stroke-width="2" style="transition: fill .35s ease, stroke .35s ease"/>
+      </g>
+
       <polygon points="192,4 208,4 200,18" fill="#ff3b30"/>
-      <circle cx="200" cy="200" r="3.5" fill="rgba(255,255,255,0.9)"/>
     </svg>
   </div>
 
@@ -178,6 +187,15 @@
   var SVG_NS = 'http://www.w3.org/2000/svg';
 
   var rotating = document.getElementById('rotating');
+
+  // ===== 水平仪参数 =====
+  var bubble = document.getElementById('bubble');
+  var LEVEL_SCALE = 1.3;   // 每度倾斜对应的气泡偏移(px)
+  var LEVEL_MAX = 20;      // 气泡圆心最大偏移(px)，超出则贴边
+  var LEVEL_FLAT = 2;      // 判定"放平"的偏移阈值(px)
+  var levelTargetX = 0, levelTargetY = 0;
+  var levelCurX = 0, levelCurY = 0;
+  var levelFlat = false;
 
   function buildDial() {
     for (var deg = 0; deg < 360; deg += 2) {
@@ -268,6 +286,27 @@
       currentHeading = (currentHeading + diff * 0.18 + 720) % 360;
       rotating.setAttribute('transform', 'rotate(' + (-currentHeading).toFixed(2) + ' ' + CX + ' ' + CY + ')');
     }
+
+    // 水平仪气泡平滑跟随
+    levelCurX += (levelTargetX - levelCurX) * 0.25;
+    levelCurY += (levelTargetY - levelCurY) * 0.25;
+    if (Math.abs(levelCurX) < 0.01 && Math.abs(levelCurY) < 0.01) { levelCurX = 0; levelCurY = 0; }
+    bubble.setAttribute('cx', (CX + levelCurX).toFixed(2));
+    bubble.setAttribute('cy', (CY + levelCurY).toFixed(2));
+
+    var d = Math.sqrt(levelCurX * levelCurX + levelCurY * levelCurY);
+    var flat = d < LEVEL_FLAT;
+    if (flat !== levelFlat) {
+      levelFlat = flat;
+      if (flat) {
+        bubble.style.fill = 'rgba(255,59,48,0.32)';
+        bubble.style.stroke = '#ff3b30';
+      } else {
+        bubble.style.fill = 'rgba(255,255,255,0.10)';
+        bubble.style.stroke = 'rgba(255,255,255,0.9)';
+      }
+    }
+
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
@@ -275,7 +314,24 @@
   var degreesEl = document.getElementById('degrees');
   var directionEl = document.getElementById('directionText');
 
+  function updateLevel(beta, gamma) {
+    // 手机平放(屏幕朝上)时 beta≈0、gamma≈0；倾斜越大气泡偏移越大
+    // beta>0 顶部抬起 -> 气泡向屏幕下方(dy>0)；gamma>0 右侧抬起 -> 气泡向左(dx<0)
+    var dx = -gamma * LEVEL_SCALE;
+    var dy = beta * LEVEL_SCALE;
+    var d = Math.sqrt(dx * dx + dy * dy);
+    if (d > LEVEL_MAX) {
+      dx = dx / d * LEVEL_MAX;
+      dy = dy / d * LEVEL_MAX;
+    }
+    levelTargetX = dx;
+    levelTargetY = dy;
+  }
+
   function handleOrientation(e) {
+    if (e.beta != null && !isNaN(e.beta) && e.gamma != null && !isNaN(e.gamma)) {
+      updateLevel(e.beta, e.gamma);
+    }
     var h = null;
     if (e.webkitCompassHeading != null && !isNaN(e.webkitCompassHeading)) {
       h = e.webkitCompassHeading;
